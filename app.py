@@ -223,16 +223,32 @@ def load_pipeline_artifacts():
     preprocessor = joblib.load(MODELS_DIR / "preprocessor.joblib")
     feature_names = joblib.load(MODELS_DIR / "feature_names.joblib")
 
-    models = {
-        "Stacking Ensemble (Champion - 93.6% AUC)": joblib.load(MODELS_DIR / "stacking_classifier.joblib"),
-        "CatBoost Classifier (93.5% AUC)": joblib.load(MODELS_DIR / "catboost.joblib"),
-        "XGBoost Classifier (93.3% AUC)": joblib.load(MODELS_DIR / "xgboost.joblib"),
-        "Soft Voting Blend (93.4% AUC)": joblib.load(MODELS_DIR / "ensemble_blend_voting.joblib"),
-        "Random Forest Classifier (92.6% AUC)": joblib.load(MODELS_DIR / "random_forest.joblib"),
-        "Histogram Gradient Boosting (93.3% AUC)": joblib.load(MODELS_DIR / "gradient_boosting.joblib"),
-        "Logistic Regression Baseline (90.7% AUC)": joblib.load(MODELS_DIR / "logistic_regression.joblib"),
-        "Deep Learning MLP Neural Net (92.0% AUC)": joblib.load(MODELS_DIR / "deep_learning_mlp.joblib"),
+    model_files = {
+        "Stacking Ensemble (Champion - 93.6% AUC)": MODELS_DIR / "stacking_classifier.joblib",
+        "CatBoost Classifier (93.5% AUC)": MODELS_DIR / "catboost.joblib",
+        "XGBoost Classifier (93.3% AUC)": MODELS_DIR / "xgboost.joblib",
+        "Soft Voting Blend (93.4% AUC)": MODELS_DIR / "ensemble_blend_voting.joblib",
+        "Random Forest Classifier (92.6% AUC)": MODELS_DIR / "random_forest.joblib",
+        "Histogram Gradient Boosting (93.3% AUC)": MODELS_DIR / "gradient_boosting.joblib",
+        "Logistic Regression Baseline (90.7% AUC)": MODELS_DIR / "logistic_regression.joblib",
+        "Deep Learning MLP Neural Net (92.0% AUC)": MODELS_DIR / "deep_learning_mlp.joblib",
     }
+
+    models = {}
+    for name, path in model_files.items():
+        if path.exists():
+            try:
+                models[name] = joblib.load(path)
+            except Exception as e:
+                # Silently catch unpickling version mismatches to prevent app crash
+                pass
+
+    # Fallback to champion model if available
+    if not models and (MODELS_DIR / "champion_model.joblib").exists():
+        try:
+            models["Stacking Ensemble (Champion)"] = joblib.load(MODELS_DIR / "champion_model.joblib")
+        except Exception:
+            pass
 
     try:
         explainer = joblib.load(MODELS_DIR / "shap_explainer.joblib")
@@ -301,6 +317,14 @@ st.markdown(f"""
 
 # --- SIDEBAR CONTROLS ---
 st.sidebar.markdown("### ⚙️ Underwriting Engine Controls")
+
+if not models:
+    st.error("⚠️ **Environment Mismatch Detected**: The trained models require the project's virtual environment dependencies.\n\n"
+             "👉 **Solution**: Run this command to launch with all models enabled:\n"
+             "```powershell\n.\\.venv\\Scripts\\streamlit run app.py\n```\n"
+             "Or double-click `run_app.bat` in the project folder.")
+    st.stop()
+
 selected_model_name = st.sidebar.selectbox(
     "Active Inference Architecture",
     list(models.keys()),
